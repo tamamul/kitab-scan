@@ -2,11 +2,6 @@ name: Build APK
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths-ignore:
-      - ".github/**"
-      - "**.md"
 
 permissions:
   contents: write
@@ -14,25 +9,50 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Build debug APK
+      - name: Build Debug APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Upload ke Releases
+      - name: Verify APK
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publish APK Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest app/build/outputs/apk/debug/app-debug.apk \
-            --title "APK terbaru" --notes "Build otomatis: ${{ github.sha }}" --prerelease
+          TAG="latest"
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes --cleanup-tag
+          fi
+
+          gh release create "$TAG" "$APK" \
+            --title "APK Terbaru" \
+            --notes "Build: ${{ github.sha }}
+
+          APK terbaru aplikasi Kitab Scan.
+
+          Unduh app-debug.apk pada bagian Assets." \
+            --prerelease
+
+      - name: Release Download URL
+        run: |
+          echo "APK: https://github.com/${{ github.repository }}/releases/download/latest/app-debug.apk"
