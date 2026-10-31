@@ -17,6 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
@@ -26,20 +30,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                var pages by remember { mutableStateOf<List<Uri>>(emptyList()) }
+                var pages by remember { mutableStateOf(PageStore.list(this@MainActivity)) }
 
-                val launcher = rememberLauncherForActivityResult(
-                    ActivityResultContracts.StartIntentSenderForResult()
-                ) { result ->
-                    val res = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
-                    pages = res?.pages?.map { it.imageUri } ?: emptyList()
-                }
-
-                val preview = remember(pages) {
-                    pages.firstOrNull()?.let { uri ->
-                        contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
-                    }
-                }
+val launcher = rememberLauncherForActivityResult(
+    ActivityResultContracts.StartIntentSenderForResult()
+) { result ->
+    val res = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+    val uris = res?.pages?.map { it.imageUri } ?: emptyList()
+    if (uris.isNotEmpty()) {
+        PageStore.addAll(this@MainActivity, uris)
+        pages = PageStore.list(this@MainActivity)
+    }
+}
 
                 Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -61,15 +63,23 @@ class MainActivity : ComponentActivity() {
                             }
                     }) { Text("Scan halaman") }
 
-                    Text("Halaman: ${pages.size}")
+                    Text("Halaman tersimpan: ${pages.size}")
 
-                    preview?.let {
-                        Image(
-                            bitmap = it.asImageBitmap(),
-                            contentDescription = "Halaman pertama",
-                            modifier = Modifier.fillMaxWidth().height(400.dp)
-                        )
-                    }
+LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    itemsIndexed(pages) { index, file ->
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Halaman ${index + 1}")
+            TextButton(onClick = {
+                PageStore.delete(file)
+                pages = PageStore.list(this@MainActivity)
+            }) { Text("Hapus") }
+        }
+    }
+}
                 }
             }
         }
