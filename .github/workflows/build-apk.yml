@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Kitab Scan APK
 
 on:
   workflow_dispatch:
@@ -11,48 +11,96 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repository
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
+      # 3. Setup Gradle
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      # 4. Download OCR Arabic models
+      - name: Unduh Model OCR
+        run: |
+          mkdir -p app/src/main/assets/ocr
+
+          BASE=https://huggingface.co/monkt/paddleocr-onnx/resolve/main
+
+          curl -L --fail --retry 3 \
+            -o app/src/main/assets/ocr/det.onnx \
+            $BASE/detection/v3/det.onnx
+
+          curl -L --fail --retry 3 \
+            -o app/src/main/assets/ocr/rec.onnx \
+            $BASE/languages/arabic/rec.onnx
+
+          curl -L --fail --retry 3 \
+            -o app/src/main/assets/ocr/dict.txt \
+            $BASE/languages/arabic/dict.txt
+
+          echo "Model OCR berhasil diunduh:"
+          ls -lh app/src/main/assets/ocr/
+
+      # 5. Build APK
       - name: Build Debug APK
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Verify APK
+      # 6. Verify APK
+      - name: Verifikasi APK
         run: |
-          test -f app/build/outputs/apk/debug/app-debug.apk
-          ls -lh app/build/outputs/apk/debug/app-debug.apk
+          APK=app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Publish APK Release
+          test -f "$APK"
+
+          echo "APK berhasil dibuat:"
+          ls -lh "$APK"
+
+      # 7. Compress APK
+      - name: Kompres APK ke ZIP
+        run: |
+          cd app/build/outputs/apk/debug
+
+          zip -9 kitab-scan.zip app-debug.apk
+
+          echo "Ukuran hasil kompres:"
+          ls -lh kitab-scan.zip
+
+      # 8. Publish Release
+      - name: Upload ke GitHub Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="latest"
-          APK="app/build/outputs/apk/debug/app-debug.apk"
+          TAG=latest
+          ZIP=app/build/outputs/apk/debug/kitab-scan.zip
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release delete "$TAG" --yes --cleanup-tag
           fi
 
-          gh release create "$TAG" "$APK" \
-            --title "APK Terbaru" \
-            --notes "Build: ${{ github.sha }}
+          gh release create "$TAG" "$ZIP" \
+            --title "Kitab Scan APK Terbaru" \
+            --notes "Build otomatis
+          
+          Commit: ${{ github.sha }}
 
-          APK terbaru aplikasi Kitab Scan.
-
-          Unduh app-debug.apk pada bagian Assets." \
+          File: kitab-scan.zip
+          Ekstrak ZIP sebelum instalasi." \
             --prerelease
 
-      - name: Release Download URL
+      # 9. Download URL
+      - name: Informasi Download
         run: |
-          echo "APK: https://github.com/${{ github.repository }}/releases/download/latest/app-debug.apk"
+          echo "================================"
+          echo "BUILD BERHASIL"
+          echo "================================"
+          echo "Download:"
+          echo "https://github.com/${{ github.repository }}/releases/download/latest/kitab-scan.zip"
