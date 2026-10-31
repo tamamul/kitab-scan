@@ -24,6 +24,9 @@ import androidx.compose.ui.Alignment
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +34,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 var pages by remember { mutableStateOf(PageStore.list(this@MainActivity)) }
+
+var ocrInfo by remember { mutableStateOf("") }
+val scope = rememberCoroutineScope()
 
 val launcher = rememberLauncherForActivityResult(
     ActivityResultContracts.StartIntentSenderForResult()
@@ -62,6 +68,18 @@ val launcher = rememberLauncherForActivityResult(
                                 launcher.launch(IntentSenderRequest.Builder(it).build())
                             }
                     }) { Text("Scan halaman") }
+
+Button(onClick = {
+    ocrInfo = "Memuat model..."
+    scope.launch {
+        ocrInfo = withContext(Dispatchers.IO) {
+            runCatching { OcrEngine(applicationContext).info() }
+                .getOrElse { "Gagal: ${it.message}" }
+        }
+    }
+}) { Text("Cek model OCR") }
+
+Text(ocrInfo)
 
                     Text("Halaman tersimpan: ${pages.size}")
 
