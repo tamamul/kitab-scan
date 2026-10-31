@@ -31,4 +31,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui")
 implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
+implementation("com.microsoft.onnxruntime:onnxruntime-android:1.19.2")
 }
