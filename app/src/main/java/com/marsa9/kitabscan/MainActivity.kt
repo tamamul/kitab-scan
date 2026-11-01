@@ -1,124 +1,223 @@
+
 package com.marsa9.kitabscan
 
-import android.graphics.BitmapFactory
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 
 class MainActivity : ComponentActivity() {
-    
-private val engine by lazy { OcrEngine(applicationContext) }
-override fun onCreate(savedInstanceState: Bundle?) {
+
+    private val engine by lazy {
+        OcrEngine(applicationContext)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             MaterialTheme {
-                var pages by remember { mutableStateOf(PageStore.list(this@MainActivity)) }
 
+                var pages by remember {
+                    mutableStateOf(PageStore.list(this@MainActivity))
+                }
 
-val scope = rememberCoroutineScope()
+                var ocrText by remember { mutableStateOf("") }
+                var isProcessing by remember { mutableStateOf(false) }
 
-val launcher = rememberLauncherForActivityResult(
-    ActivityResultContracts.StartIntentSenderForResult()
-) { result ->
-    val res = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
-    val uris = res?.pages?.map { it.imageUri } ?: emptyList()
-    if (uris.isNotEmpty()) {
-        PageStore.addAll(this@MainActivity, uris)
-        pages = PageStore.list(this@MainActivity)
-    }
-}
-var ocrText by remember { mutableStateOf("") }
+                val scope = rememberCoroutineScope()
 
+                val launcher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.StartIntentSenderForResult()
+                ) { result ->
+
+                    val scanResult =
+                        GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+
+                    val uris = scanResult?.pages?.map { it.imageUri }
+                        ?: emptyList()
+
+                    if (uris.isNotEmpty()) {
+                        PageStore.addAll(this@MainActivity, uris)
+                        pages = PageStore.list(this@MainActivity)
+                    }
+                }
 
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    Text("Kitab Scan", style = MaterialTheme.typography.headlineMedium)
 
-                    Button(onClick = {
-                        val options = GmsDocumentScannerOptions.Builder()
-                            .setGalleryImportAllowed(true)
-                            .setPageLimit(20)
-                            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-                            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
-                            .build()
-                        GmsDocumentScanning.getClient(options)
-                            .getStartScanIntent(this@MainActivity)
-                            .addOnSuccessListener {
-                                launcher.launch(IntentSenderRequest.Builder(it).build())
+                    Text(
+                        text = "MARSA KitabScan",
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+
+                    Text(
+                        text = "Pemindai kitab dan pengenalan teks Arab",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Button(
+                        onClick = {
+                            val options =
+                                GmsDocumentScannerOptions.Builder()
+                                    .setGalleryImportAllowed(true)
+                                    .setPageLimit(20)
+                                    .setResultFormats(
+                                        GmsDocumentScannerOptions.RESULT_FORMAT_JPEG
+                                    )
+                                    .setScannerMode(
+                                        GmsDocumentScannerOptions.SCANNER_MODE_FULL
+                                    )
+                                    .build()
+
+                            GmsDocumentScanning.getClient(options)
+                                .getStartScanIntent(this@MainActivity)
+                                .addOnSuccessListener {
+                                    launcher.launch(
+                                        IntentSenderRequest.Builder(it).build()
+                                    )
+                                }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Scan halaman")
+                    }
+
+                    HorizontalDivider()
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "Halaman tersimpan",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+
+                        Text(
+                            "${pages.size}",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(pages) { index, file ->
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement =
+                                        Arrangement.SpaceBetween
+                                ) {
+
+                                    Text("Halaman ${index + 1}")
+
+                                    Row {
+                                        TextButton(
+                                            enabled = !isProcessing,
+                                            onClick = {
+                                                isProcessing = true
+                                                ocrText =
+                                                    "Sedang membaca halaman ${index + 1}..."
+
+                                                scope.launch {
+                                                    ocrText =
+                                                        withContext(Dispatchers.IO) {
+                                                            runCatching {
+                                                                engine.recognizePage(file)
+                                                            }.getOrElse {
+                                                                "Gagal OCR: ${it.message}"
+                                                            }
+                                                        }
+
+                                                    isProcessing = false
+                                                }
+                                            }
+                                        ) {
+                                            Text("OCR")
+                                        }
+
+                                        TextButton(
+                                            enabled = !isProcessing,
+                                            onClick = {
+                                                PageStore.delete(file)
+                                                pages = PageStore.list(
+                                                    this@MainActivity
+                                                )
+                                            }
+                                        ) {
+                                            Text("Hapus")
+                                        }
+                                    }
+                                }
                             }
-                    }) { Text("Scan halaman") }
+                        }
+                    }
 
+                    HorizontalDivider()
 
+                    Text(
+                        "Hasil OCR",
+                        style = MaterialTheme.typography.titleMedium
+                    )
 
-Text(ocrInfo)
-
-                    Text("Halaman tersimpan: ${pages.size}")
-
-LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    itemsIndexed(pages) { index, file ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Halaman ${index + 1}")
-            Row {
-    TextButton(onClick = {
-        ocrText = "Membaca halaman ${index + 1}..."
-        scope.launch {
-            ocrText = withContext(Dispatchers.IO) {
-                runCatching { engine.recognizePage(file) }
-                    .getOrElse { "Gagal: ${it.message}" }
-            }
-        }
-    }) { Text("OCR") }
-    TextButton(onClick = {
-        PageStore.delete(file)
-        pages = PageStore.list(this@MainActivity)
-    }) { Text("Hapus") }
-}
-        }
-    }
-}
-
-CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-    Text(
-        text = ocrText,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(260.dp)
-            .verticalScroll(rememberScrollState())
-    )
-}
+                    CompositionLocalProvider(
+                        LocalLayoutDirection provides LayoutDirection.Rtl
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(220.dp),
+                            tonalElevation = 2.dp,
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(16.dp)
+                            ) {
+                                Text(
+                                    text = ocrText.ifBlank {
+                                        "Hasil pembacaan teks Arab akan muncul di sini."
+                                    },
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
