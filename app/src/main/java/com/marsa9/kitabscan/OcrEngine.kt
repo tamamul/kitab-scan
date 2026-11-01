@@ -4,6 +4,14 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
+import ai.onnxruntime.OnnxTensor
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import java.io.File
+import java.nio.FloatBuffer
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 class OcrEngine(context: Context) {
     private val env = OrtEnvironment.getEnvironment()
