@@ -27,15 +27,21 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
+    
+private val engine by lazy { OcrEngine(applicationContext) }
+override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
                 var pages by remember { mutableStateOf(PageStore.list(this@MainActivity)) }
 
-var ocrInfo by remember { mutableStateOf("") }
+
 val scope = rememberCoroutineScope()
 
 val launcher = rememberLauncherForActivityResult(
@@ -48,6 +54,8 @@ val launcher = rememberLauncherForActivityResult(
         pages = PageStore.list(this@MainActivity)
     }
 }
+var ocrText by remember { mutableStateOf("") }
+
 
                 Column(
                     modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -69,15 +77,7 @@ val launcher = rememberLauncherForActivityResult(
                             }
                     }) { Text("Scan halaman") }
 
-Button(onClick = {
-    ocrInfo = "Memuat model..."
-    scope.launch {
-        ocrInfo = withContext(Dispatchers.IO) {
-            runCatching { OcrEngine(applicationContext).info() }
-                .getOrElse { "Gagal: ${it.message}" }
-        }
-    }
-}) { Text("Cek model OCR") }
+
 
 Text(ocrInfo)
 
@@ -91,12 +91,33 @@ LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Halaman ${index + 1}")
-            TextButton(onClick = {
-                PageStore.delete(file)
-                pages = PageStore.list(this@MainActivity)
-            }) { Text("Hapus") }
+            Row {
+    TextButton(onClick = {
+        ocrText = "Membaca halaman ${index + 1}..."
+        scope.launch {
+            ocrText = withContext(Dispatchers.IO) {
+                runCatching { engine.recognizePage(file) }
+                    .getOrElse { "Gagal: ${it.message}" }
+            }
+        }
+    }) { Text("OCR") }
+    TextButton(onClick = {
+        PageStore.delete(file)
+        pages = PageStore.list(this@MainActivity)
+    }) { Text("Hapus") }
+}
         }
     }
+}
+
+CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+    Text(
+        text = ocrText,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(260.dp)
+            .verticalScroll(rememberScrollState())
+    )
 }
                 }
             }
